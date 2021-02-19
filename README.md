@@ -1,5 +1,14 @@
-exp4j
+exp4j修改版
 -----
-exp4j is a mathematical expression evaluator for the Java programming language. It is a simple-to-use and small library (~50kb) without any external dependencies.
 
-Check out http://www.objecthunter.net/exp4j/ for documentation and examples
+Fork自原来的[exp4j](https://github.com/fasseg/exp4j),
+做了一点修改，使其额外支持**String**类型的运算。
+
+String
+----
+
+- 字符串字面量: `''` 或 `""`
+
+- 字符串连接: `str + 114514`
+
+- 字符串乘法: `str * 250`
