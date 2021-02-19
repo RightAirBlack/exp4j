@@ -152,7 +152,7 @@ public class Tokenizer {
     private Token parseString(char end) { // "=]"
         // final int offset = ++this.pos;
         if (isEndOfExpression(++pos)) {
-            throw new RuntimeException("Expect end of string! -1");
+            throw new RuntimeException("Expect end of string!");
         }
         
         StringBuilder sb = new StringBuilder();
@@ -160,24 +160,46 @@ public class Tokenizer {
                expression[pos] != end) {
             if (expression[pos] == '\\') {
                 switch (expression[++pos]) {
+                    case '0':
+                        sb.append('\0');
+                        break;
+                    case 'b':
+                        sb.append('\b');
+                        break;
+                    case 'f':
+                        sb.append('\f');
+                        break;
                     case 'n':
                         sb.append('\n');
                         break;
+                    case 'r':
+                        sb.append('\r');
+                        break;
                     case 't':
                         sb.append('\t');
+                        break;
+                    case '"':
+                        sb.append('"');
+                        break;
+                    case '\'':
+                        sb.append('\'');
+                        break;
+                    case '\\':
+                        sb.append('\\');
                         break;
                     default:
                         throw new RuntimeException("Unsupport \\" + expression[pos]);
                 }
                 pos++;
+            } else {
+                sb.append(expression[pos++]);
             }
-            sb.append(expression[pos++]);
         }
         pos++;
         
         // int len = this.pos - offset;
         if (isEndOfExpression(pos - 1) && expression[pos - 2] != end) {
-            throw new RuntimeException("Expect end of string! -2");
+            throw new RuntimeException("Expect end of string!");
         }
         lastToken = new StringToken(sb.toString());
         return lastToken;
