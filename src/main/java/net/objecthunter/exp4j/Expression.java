@@ -1,4 +1,4 @@
-/*
+/* 
  * Copyright 2014 Frank Asseg
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,52 +11,66 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License. 
  */
 package net.objecthunter.exp4j;
 
 import net.objecthunter.exp4j.function.Function;
 import net.objecthunter.exp4j.function.Functions;
 import net.objecthunter.exp4j.operator.Operator;
-import net.objecthunter.exp4j.tokenizer.*;
+import net.objecthunter.exp4j.tokenizer.FunctionToken;
+import net.objecthunter.exp4j.tokenizer.NumberToken;
+import net.objecthunter.exp4j.tokenizer.OperatorToken;
+import net.objecthunter.exp4j.tokenizer.Token;
+import net.objecthunter.exp4j.tokenizer.VariableToken;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import net.objecthunter.exp4j.tokenizer.*;
 
 public class Expression {
 
     private final Token[] tokens;
 
-    private final Map<String, Double> variables;
+    private final Map<String, ExpressionValue> variables;
 
     private final Set<String> userFunctionNames;
 
-    private static Map<String, Double> createDefaultVariables() {
-        final Map<String, Double> vars = new HashMap<>(4);
-        vars.put("pi", Math.PI);
-        vars.put("π", Math.PI);
-        vars.put("φ", 1.61803398874d);
-        vars.put("e", Math.E);
+    private static Map<String, ExpressionValue> createDefaultVariables() {
+        final Map<String, ExpressionValue> vars = new HashMap<String, ExpressionValue>(4);
+        vars.put("pi", ExpressionValue.valueOf(Math.PI));
+        vars.put("π", ExpressionValue.valueOf(Math.PI));
+        vars.put("φ", ExpressionValue.valueOf(1.61803398874d));
+        vars.put("e", ExpressionValue.valueOf(Math.E));
         return vars;
     }
-
+    
     /**
      * Creates a new expression that is a copy of the existing one.
-     *
+     * 
      * @param existing the expression to copy
      */
     public Expression(final Expression existing) {
-        this.tokens = Arrays.copyOf(existing.tokens, existing.tokens.length);
-        this.variables = new HashMap<>();
-        this.variables.putAll(existing.variables);
-        this.userFunctionNames = new HashSet<>(existing.userFunctionNames);
+    	this.tokens = Arrays.copyOf(existing.tokens, existing.tokens.length);
+    	this.variables = new HashMap<String,ExpressionValue>();
+    	this.variables.putAll(existing.variables);
+    	this.userFunctionNames = new HashSet<String>(existing.userFunctionNames);
     }
 
     Expression(final Token[] tokens) {
         this.tokens = tokens;
         this.variables = createDefaultVariables();
-        this.userFunctionNames = Collections.emptySet();
+        this.userFunctionNames = Collections.<String>emptySet();
     }
 
     Expression(final Token[] tokens, Set<String> userFunctionNames) {
@@ -67,10 +81,22 @@ public class Expression {
 
     public Expression setVariable(final String name, final double value) {
         this.checkVariableName(name);
-        this.variables.put(name, value);
+        this.variables.put(name, ExpressionValue.valueOf(value));
         return this;
     }
 
+    public Expression setVariable(final String name, final String value) {
+        this.checkVariableName(name);
+        this.variables.put(name, ExpressionValue.valueOf(value));
+        return this;
+    }
+    
+    public Expression setVariable(final String name, final char value) {
+        this.checkVariableName(name);
+        this.variables.put(name, ExpressionValue.valueOf(value));
+        return this;
+    }
+    
     private void checkVariableName(String name) {
         if (this.userFunctionNames.contains(name) || Functions.getBuiltinFunction(name) != null) {
             throw new IllegalArgumentException("The variable name '" + name + "' is invalid. Since there exists a function with the same name");
@@ -84,22 +110,31 @@ public class Expression {
         return this;
     }
 
-    public Expression clearVariables() {
-        this.variables.clear();
+    public Expression setVariables(Map<String, String> variables) {
+        for (Map.Entry<String, String> v : variables.entrySet()) {
+            this.setVariable(v.getKey(), v.getValue());
+        }
         return this;
     }
-
+    
+    public Expression setVariables(Map<String, Character> variables) {
+        for (Map.Entry<String, Character> v : variables.entrySet()) {
+            this.setVariable(v.getKey(), v.getValue());
+        }
+        return this;
+    }
+    
     public Set<String> getVariableNames() {
-        final Set<String> variables = new HashSet<>();
-        for (final Token t : tokens) {
+        final Set<String> variables = new HashSet<String>();
+        for (final Token t: tokens) {
             if (t.getType() == Token.TOKEN_VARIABLE)
-                variables.add(((VariableToken) t).getName());
+                variables.add(((VariableToken)t).getName());
         }
         return variables;
     }
 
     public ValidationResult validate(boolean checkVariablesSet) {
-        final List<String> errors = new ArrayList<>(0);
+        final List<String> errors = new ArrayList<String>(0);
         if (checkVariablesSet) {
             /* check that all vars have a value set */
             for (final Token t : this.tokens) {
@@ -123,11 +158,12 @@ public class Expression {
             switch (tok.getType()) {
                 case Token.TOKEN_NUMBER:
                 case Token.TOKEN_VARIABLE:
+                case Token.TOKEN_STRING:
                     count++;
                     break;
                 case Token.TOKEN_FUNCTION:
                     final Function func = ((FunctionToken) tok).getFunction();
-                    final int argsNum = func.getNumArguments();
+                    final int argsNum = func.getNumArguments(); 
                     if (argsNum > count) {
                         errors.add("Not enough arguments for '" + func.getName() + "'");
                     }
@@ -161,18 +197,26 @@ public class Expression {
         return validate(true);
     }
 
-    public Future<Double> evaluateAsync(ExecutorService executor) {
-        return executor.submit(this::evaluate);
+    public Future<ExpressionValue> evaluateAsync(ExecutorService executor) {
+        return executor.submit(new Callable<ExpressionValue>() {
+            @Override
+            public ExpressionValue call() throws Exception {
+                return evaluate();
+            }
+        });
     }
 
-    public double evaluate() {
+    public ExpressionValue evaluate() {
         final ArrayStack output = new ArrayStack();
-        for (Token t : tokens) {
+        for (int i = 0; i < tokens.length; i++) {
+            Token t = tokens[i];
             if (t.getType() == Token.TOKEN_NUMBER) {
                 output.push(((NumberToken) t).getValue());
+            } else if (t.getType() == Token.TOKEN_STRING) {
+                output.push(((StringToken) t).getValue());
             } else if (t.getType() == Token.TOKEN_VARIABLE) {
                 final String name = ((VariableToken) t).getName();
-                final Double value = this.variables.get(name);
+                final ExpressionValue value = this.variables.get(name);
                 if (value == null) {
                     throw new IllegalArgumentException("No value has been set for the setVariable '" + name + "'.");
                 }
@@ -184,12 +228,12 @@ public class Expression {
                 }
                 if (op.getOperator().getNumOperands() == 2) {
                     /* pop the operands and push the result of the operation */
-                    double rightArg = output.pop();
-                    double leftArg = output.pop();
+                    ExpressionValue rightArg = output.pop();
+                    ExpressionValue leftArg = output.pop();
                     output.push(op.getOperator().apply(leftArg, rightArg));
                 } else if (op.getOperator().getNumOperands() == 1) {
                     /* pop the operand and push the result of the operation */
-                    double arg = output.pop();
+                    ExpressionValue arg = output.pop();
                     output.push(op.getOperator().apply(arg));
                 }
             } else if (t.getType() == Token.TOKEN_FUNCTION) {
@@ -199,7 +243,7 @@ public class Expression {
                     throw new IllegalArgumentException("Invalid number of arguments available for '" + func.getFunction().getName() + "' function");
                 }
                 /* collect the arguments from the stack */
-                double[] args = new double[numArguments];
+                ExpressionValue[] args = new ExpressionValue[numArguments];
                 for (int j = numArguments - 1; j >= 0; j--) {
                     args[j] = output.pop();
                 }

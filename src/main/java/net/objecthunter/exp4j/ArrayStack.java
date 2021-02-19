@@ -25,7 +25,7 @@ import java.util.EmptyStackException;
  */
 class ArrayStack {
 
-    private double[] data;
+    private ExpressionValue[] data;
 
     private int idx;
 
@@ -39,28 +39,58 @@ class ArrayStack {
                     "Stack's capacity must be positive");
         }
 
-        data = new double[initialCapacity];
+        data = new ExpressionValue[initialCapacity];
         idx = -1;
     }
 
-    void push(double value) {
+    void push(ExpressionValue value) {
         if (idx + 1 == data.length) {
-            double[] temp = new double[(int) (data.length * 1.2) + 1];
+            ExpressionValue[] temp = new ExpressionValue[(int) (data.length * 1.2) + 1];
             System.arraycopy(data, 0, temp, 0, data.length);
             data = temp;
         }
 
         data[++idx] = value;
     }
+    
+    void push(double value) {
+        if (idx + 1 == data.length) {
+            ExpressionValue[] temp = new ExpressionValue[(int) (data.length * 1.2) + 1];
+            System.arraycopy(data, 0, temp, 0, data.length);
+            data = temp;
+        }
 
-    double peek() {
+        data[++idx] = ExpressionValue.valueOf(value);
+    }
+
+    void push(char value) {
+        if (idx + 1 == data.length) {
+            ExpressionValue[] temp = new ExpressionValue[(int) (data.length * 1.2) + 1];
+            System.arraycopy(data, 0, temp, 0, data.length);
+            data = temp;
+        }
+
+        data[++idx] = ExpressionValue.valueOf(value);
+    }
+    
+    void push(String value) {
+        if (idx + 1 == data.length) {
+            ExpressionValue[] temp = new ExpressionValue[(int) (data.length * 1.2) + 1];
+            System.arraycopy(data, 0, temp, 0, data.length);
+            data = temp;
+        }
+
+        data[++idx] = ExpressionValue.valueOf(value);
+    }
+    
+    ExpressionValue peek() {
         if (idx == -1) {
             throw new EmptyStackException();
         }
         return data[idx];
     }
 
-    double pop() {
+    ExpressionValue pop() {
         if (idx == -1) {
             throw new EmptyStackException();
         }
